@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Plane, Box, useTexture, Stars } from '@react-three/drei';
+import { Plane, Box, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
 export const SkatingRink = () => {
