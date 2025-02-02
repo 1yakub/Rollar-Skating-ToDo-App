@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Box, VStack, HStack, Text, Input, Button, Badge, useToast } from '@chakra-ui/react';
-import { CheckIcon, DeleteIcon, StarIcon } from '@chakra-ui/icons';
+import { Box, VStack, HStack, Text, Input, Button, Badge, useToast, Select } from '@chakra-ui/react';
+import { CheckIcon, DeleteIcon, StarIcon, AddIcon } from '@chakra-ui/icons';
 import useSound from 'use-sound';
 import { Todo } from '../models/Todo';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,12 +9,27 @@ import { v4 as uuidv4 } from 'uuid';
 export const TodoList = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodoTitle, setNewTodoTitle] = useState('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Todo['difficulty']>('beginner');
+  const [selectedStyle, setSelectedStyle] = useState<Todo['skatingStyle']>('freestyle');
   const toast = useToast();
 
-  // Sound effects - you'll need to add actual sound files
+  // Sound effects
   const [playComplete] = useSound('/sounds/complete.mp3');
   const [playAdd] = useSound('/sounds/add.mp3');
   const [playDelete] = useSound('/sounds/delete.mp3');
+
+  // Load todos from localStorage
+  useEffect(() => {
+    const savedTodos = localStorage.getItem('skating-todos');
+    if (savedTodos) {
+      setTodos(JSON.parse(savedTodos));
+    }
+  }, []);
+
+  // Save todos to localStorage
+  useEffect(() => {
+    localStorage.setItem('skating-todos', JSON.stringify(todos));
+  }, [todos]);
 
   const addTodo = () => {
     if (!newTodoTitle.trim()) return;
@@ -23,10 +38,10 @@ export const TodoList = () => {
       id: uuidv4(),
       title: newTodoTitle,
       completed: false,
-      difficulty: 'beginner',
-      skatingStyle: 'freestyle',
+      difficulty: selectedDifficulty,
+      skatingStyle: selectedStyle,
       createdAt: new Date(),
-      points: 10,
+      points: calculatePoints(selectedDifficulty),
       streakCount: 0,
     };
 
@@ -40,7 +55,17 @@ export const TodoList = () => {
       status: "success",
       duration: 2000,
       isClosable: true,
+      position: "top-right"
     });
+  };
+
+  const calculatePoints = (difficulty: Todo['difficulty']): number => {
+    switch (difficulty) {
+      case 'beginner': return 10;
+      case 'intermediate': return 20;
+      case 'advanced': return 30;
+      default: return 10;
+    }
   };
 
   const toggleTodo = (id: string) => {
@@ -50,11 +75,12 @@ export const TodoList = () => {
         if (completed) {
           playComplete();
           toast({
-            title: "Awesome move! 🌟",
+            title: `Awesome move! 🌟 +${todo.points} points!`,
             description: "You're getting better every day!",
             status: "success",
             duration: 2000,
             isClosable: true,
+            position: "top-right"
           });
         }
         return {
@@ -73,23 +99,59 @@ export const TodoList = () => {
     playDelete();
   };
 
+  const getTotalPoints = () => {
+    return todos.reduce((total, todo) => total + (todo.completed ? todo.points : 0), 0);
+  };
+
   return (
     <VStack spacing={4} width="100%" maxW="600px" p={4}>
       <Text fontSize="2xl" fontWeight="bold" color="purple.500">
         🛼 Mirpur Roller Skating Club Tasks 🛼
       </Text>
+      
+      <Text fontSize="lg" color="gray.600">
+        Total Points: {getTotalPoints()} 🏆
+      </Text>
 
-      <HStack width="100%">
-        <Input
-          value={newTodoTitle}
-          onChange={(e) => setNewTodoTitle(e.target.value)}
-          placeholder="Add a new skating trick or task..."
-          onKeyPress={(e) => e.key === 'Enter' && addTodo()}
-        />
-        <Button colorScheme="purple" onClick={addTodo}>
-          Add
-        </Button>
-      </HStack>
+      <Box width="100%" bg="white" p={4} borderRadius="lg" boxShadow="sm">
+        <VStack spacing={3}>
+          <Input
+            value={newTodoTitle}
+            onChange={(e) => setNewTodoTitle(e.target.value)}
+            placeholder="Add a new skating trick or task..."
+            onKeyPress={(e) => e.key === 'Enter' && addTodo()}
+          />
+          
+          <HStack width="100%">
+            <Select
+              value={selectedDifficulty}
+              onChange={(e) => setSelectedDifficulty(e.target.value as Todo['difficulty'])}
+            >
+              <option value="beginner">Beginner (10pts)</option>
+              <option value="intermediate">Intermediate (20pts)</option>
+              <option value="advanced">Advanced (30pts)</option>
+            </Select>
+            
+            <Select
+              value={selectedStyle}
+              onChange={(e) => setSelectedStyle(e.target.value as Todo['skatingStyle'])}
+            >
+              <option value="freestyle">Freestyle</option>
+              <option value="speed">Speed</option>
+              <option value="dance">Dance</option>
+              <option value="slalom">Slalom</option>
+            </Select>
+            
+            <Button
+              colorScheme="purple"
+              onClick={addTodo}
+              leftIcon={<AddIcon />}
+            >
+              Add
+            </Button>
+          </HStack>
+        </VStack>
+      </Box>
 
       <AnimatePresence>
         {todos.map((todo) => (
@@ -99,6 +161,7 @@ export const TodoList = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, x: -100 }}
             style={{ width: '100%' }}
+            layout
           >
             <Box
               p={4}
@@ -108,6 +171,11 @@ export const TodoList = () => {
               bg={todo.completed ? 'green.50' : 'white'}
               position="relative"
               overflow="hidden"
+              transition="all 0.2s"
+              _hover={{
+                transform: 'translateY(-2px)',
+                boxShadow: 'md'
+              }}
               _before={{
                 content: '""',
                 position: 'absolute',
@@ -122,6 +190,7 @@ export const TodoList = () => {
               <HStack justify="space-between">
                 <VStack align="start" spacing={1}>
                   <Text
+                    fontSize="lg"
                     textDecoration={todo.completed ? 'line-through' : 'none'}
                     color={todo.completed ? 'gray.500' : 'black'}
                   >
@@ -130,6 +199,7 @@ export const TodoList = () => {
                   <HStack spacing={2}>
                     <Badge colorScheme="purple">{todo.skatingStyle}</Badge>
                     <Badge colorScheme="blue">{todo.difficulty}</Badge>
+                    <Badge colorScheme="green">{todo.points}pts</Badge>
                     {todo.streakCount > 0 && (
                       <Badge colorScheme="orange">
                         <StarIcon mr={1} />
@@ -143,6 +213,7 @@ export const TodoList = () => {
                     size="sm"
                     colorScheme={todo.completed ? 'green' : 'gray'}
                     onClick={() => toggleTodo(todo.id)}
+                    variant={todo.completed ? 'solid' : 'outline'}
                   >
                     <CheckIcon />
                   </Button>
@@ -150,6 +221,7 @@ export const TodoList = () => {
                     size="sm"
                     colorScheme="red"
                     onClick={() => deleteTodo(todo.id)}
+                    variant="ghost"
                   >
                     <DeleteIcon />
                   </Button>
